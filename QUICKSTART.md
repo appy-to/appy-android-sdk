@@ -1,14 +1,26 @@
-# Android quickstart
+# Add Appy to your Android app
 
-Download the SDK from [GitHub Releases](https://github.com/appy-to/appy-android-sdk/releases/tag/1.0.0). Maven Central distribution is being prepared. The hosted SDK endpoints require an Appy Enterprise app.
+Use Appy to open the right screen in **your existing Android app** when someone taps one of your links. Requires Android API 21+.
 
-## 1. Get your app values
+## 1. Get the two values for your app
 
-Register your package name and signing certificate SHA-256 fingerprints in **Apps & SDK**. For Play App Signing use Google's **app signing** certificate, not only your upload certificate. Copy the publishable key and link domain.
+In the [Appy dashboard](https://appy.to), open **Apps & SDK → New app**, register your own app, and open its **SDK setup** card. Copy **Publishable key** and **Link domain**. If it is already registered, open that app instead of creating another one.
 
-## 2. Install
+[Which dashboard fields do I fill in?](SETUP.md#1-add-your-app-in-the-dashboard)
 
-Requires Android API 21+. Download `appy-sdk-1.0.0.aar` from the release above, put it in `app/libs/` and add to the app module:
+In every snippet below:
+
+- Replace `YOUR_PUBLISHABLE_KEY` with the **entire key** copied from the dashboard.
+- Replace `your-app.appy.to` with the **Link domain** copied from the dashboard.
+- Keep names such as `Appy`, `AppySDK` and the package imports. They name the library you are adding; your own app keeps its name and identifiers.
+
+The hosted SDK features require an Enterprise plan. You do not need a secret API key or a `curl` registration request for these steps.
+
+## 2. Add the SDK file to your project
+
+1. Download **appy-sdk-1.0.0.aar** from [GitHub Releases](https://github.com/appy-to/appy-android-sdk/releases/tag/1.0.0).
+2. Copy the file into your app module's `libs/` folder, usually `app/libs/`.
+3. Add these dependencies to that app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
@@ -17,33 +29,41 @@ dependencies {
 }
 ```
 
-The Install Referrer library is obtained from Google's Maven repository (`google()`), under its own license. Public Maven coordinates will replace the AAR step after publication.
+Keep the `appy-sdk` filename and Google dependency name. Ensure `google()` is present in your project's dependency repositories. Java-only projects without the Kotlin plugin also need [the Kotlin standard library dependency](README.md#requirements-and-installation). Maven Central installation is not available yet.
 
-## 3. Enable App Links
+## 3. Connect your link domain to your app
 
-Add an `android:autoVerify="true"` HTTPS intent filter for your link domain to your main activity, plus your custom-scheme filter. Copy the complete [intent filter example](README.md#intent-filters). Follow [backup exclusion](README.md#keep-the-first-launch-a-first-launch) so restored SDK state does not suppress first-install attribution.
+Use the Link domain copied from the dashboard in an HTTPS App Link intent filter. [Copy the complete manifest example](README.md#intent-filters), replacing only the example domain and your custom scheme.
 
-## 4. Configure and receive links
+In the dashboard, register the certificate for the build you are testing. A Play Store build uses Google's **app signing certificate**; a debug build uses your debug certificate. [Where to find each value](SETUP.md#1-add-your-app-in-the-dashboard).
 
-In your `Application.onCreate()`:
+## 4. Paste your values and receive links
+
+Add these imports at the top of your Kotlin file:
 
 ```kotlin
 import to.appy.sdk.Appy
 import to.appy.sdk.AppyConfig
 import to.appy.sdk.AppyDeepLinkResult
+```
 
+In your own `Application` class, inside `onCreate()` after `super.onCreate()`:
+
+```kotlin
 Appy.init(this, AppyConfig(
-    "appy_pk_REPLACE_WITH_YOUR_PUBLISHABLE_KEY",
-    listOf("YOUR_SUBDOMAIN.appy.to")
+    "YOUR_PUBLISHABLE_KEY",
+    listOf("your-app.appy.to")
 ))
 Appy.setDeepLinkListener { result ->
     if (result is AppyDeepLinkResult.Found) {
-        // Route using result.link.slug and result.link.parameters.
+        // Use result.link.slug and result.link.parameters to choose your screen.
     }
 }
 ```
 
-The SDK reads the initial activity intent. Forward warm links from your activity:
+Keep the `to.appy.sdk` imports: they identify the library. They do **not** replace your app's own package name. Declare your `Application` class in your manifest if you have not already done so; [full example](README.md#initialise).
+
+The SDK reads the first activity intent. In your activity, forward links received while the app is already open:
 
 ```kotlin
 override fun onNewIntent(intent: Intent) {
@@ -53,8 +73,8 @@ override fun onNewIntent(intent: Intent) {
 }
 ```
 
-## 5. Check the integration
+## 5. Test a real link
 
-Tap an Appy link on a device with the app installed; verify the callback and dashboard. Test a new store install through a link to verify deferred delivery and referrer attribution. Check `https://YOUR_SUBDOMAIN.appy.to/.well-known/assetlinks.json` if links stay in the browser.
+Create a link for this dashboard app, install your app and tap the link. Check the deep-link callback. Follow [backup exclusion](README.md#keep-the-first-launch-a-first-launch) before testing fresh installs.
 
-Use only a publishable key in the app. Keep debug logs off in production and validate route parameters. See the [full guide](README.md) for events, consent and troubleshooting.
+For events, consent and troubleshooting, see the [full guide](README.md). If an example value is unclear, use [this replacement table](SETUP.md#2-know-which-values-to-replace).

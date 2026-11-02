@@ -2,7 +2,9 @@
 
 ![Appy — Deep links, install attribution and revenue analytics](docs/assets/appy-banner.svg)
 
-**[Start here: short installation guide](QUICKSTART.md)** · [Full documentation](https://appy.to/docs/sdk/android)
+**[Start here: short installation guide](QUICKSTART.md)** · [Which names and values do I replace?](SETUP.md)
+
+**This is a library for your own app.** Keep the `Appy` SDK/package names in code; use your own app name, identifiers, publishable key and link domain. [Get those values from the dashboard](SETUP.md).
 
 The Appy Android SDK connects your app to [Appy](https://appy.to) smart links. It opens the right screen when someone taps an Appy link, keeps the link through a fresh install from Google Play, Huawei AppGallery or another store (deferred deep linking), tells you which link brought each install, records in-app events, and builds share links on your link domain.
 
@@ -14,38 +16,26 @@ Appy links also work without any SDK: they open the store or your website and pa
 
 ## Contents
 
-1. [Lightweight by design](#lightweight-by-design)
-2. [Requirements and installation](#requirements-and-installation)
-3. [Register your app](#register-your-app)
-4. [Intent filters](#intent-filters)
-5. [Initialise](#initialise)
-6. [Handle incoming intents](#handle-incoming-intents)
-7. [Receive deep links](#receive-deep-links)
-8. [Deferred deep linking](#deferred-deep-linking)
-9. [Install attribution](#install-attribution)
-10. [Track events](#track-events)
-11. [User id, privacy and opt-out](#user-id-privacy-and-opt-out)
-12. [Share links](#share-links)
-13. [Debugging](#debugging)
+1. [Requirements and installation](#requirements-and-installation)
+2. [Register your app](#register-your-app)
+3. [Intent filters](#intent-filters)
+4. [Initialise](#initialise)
+5. [Handle incoming intents](#handle-incoming-intents)
+6. [Receive deep links](#receive-deep-links)
+7. [Deferred deep linking](#deferred-deep-linking)
+8. [Install attribution](#install-attribution)
+9. [Track events](#track-events)
+10. [User id, privacy and opt-out](#user-id-privacy-and-opt-out)
+11. [Share links](#share-links)
+12. [Debugging](#debugging)
+13. [Lightweight by design](#lightweight-by-design)
 14. [API reference](#api-reference)
 15. [For maintainers](#for-maintainers)
-
-## Lightweight by design
-
-| | |
-|---|---|
-| Source | 9 Kotlin files, 1,145 non-blank lines |
-| Dependencies | `com.android.installreferrer:installreferrer:2.2` and the Kotlin standard library. No AndroidX, no Play Services, no HMS Core, no OkHttp, no JSON library |
-| Release AAR | 114,780 bytes; `classes.jar` inside it 119,602 bytes (54 classes) |
-| Dex added to an app | about 75 KB (74,620 bytes, 677 method references) after R8 with the whole public API kept, of which about 4 KB is the Install Referrer library. An app that uses only part of the API gets less |
-| Threads | two daemon threads created on first use: one for SDK state and timers, one for HTTP. On the first launch of an app installed from AppGallery, one more short-lived thread reads the AppGallery referrer |
-| Requests per cold start | one `POST /v1/sdk/open`, sent after at most `launchLinkWaitMillis` (and on a first launch at most 3 s for the install referrer) |
-| Other requests | one open per Appy link that opens the running app; event batches of up to 100 events and 256 KB, sent 2 s after the last `track` or when the app goes to the background |
-| Not included | no ContentProvider auto-initialisation, no WorkManager jobs, no reflection, no advertising ID, no UI |
+16. [Third-party licensing](#third-party-licensing)
 
 ## Requirements and installation
 
-- Android 5.0 (API 21) or newer, Java 8 compatible bytecode. Kotlin projects need Kotlin 1.9 or newer (the SDK is built with Kotlin 2.0). Java projects work too; every example below has a Java version.
+- Android 5.0 (API 21) or newer, Java 8 compatible bytecode. Kotlin projects need Kotlin 2.0-compatible tooling (this release is built with Kotlin 2.0.21). Java projects work too; every example below has a Java version.
 - An app registered with Appy on the Enterprise plan. Keys on other plans receive `403 plan_required`.
 - A publishable key (`appy_pk_...`). Never put a secret key (`appy_sk_...`) in an app.
 
@@ -58,7 +48,13 @@ dependencies {
 }
 ```
 
-Coming soon: the Maven coordinates `to.appy:appy-sdk:1.0.0`, which will replace both lines above.
+Ensure `google()` is present in your project’s dependency repositories. If this is a Java-only project without the Kotlin Gradle plugin, also add the Kotlin standard library:
+
+```kotlin
+implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
+```
+
+Maven Central installation is being prepared. Use the GitHub AAR instructions above for now.
 
 No ProGuard or R8 rules are needed. The manifest merges `android.permission.INTERNET` and two `<queries>` entries, which keep the Play Store's install referrer service and AppGallery's attribution provider visible on Android 11 and newer:
 
@@ -71,39 +67,22 @@ No ProGuard or R8 rules are needed. The manifest merges `android.permission.INTE
 
 ## Register your app
 
-Android verifies App Links by downloading `https://<subdomain>.appy.to/.well-known/assetlinks.json`. Appy publishes that file once your app is registered with its package name and the SHA-256 fingerprints of every certificate that signs builds users install:
+Open **Apps & SDK → New app** in the [Appy dashboard](https://appy.to). Use your own app's name, choose its link subdomain, enable Android, and enter your **Package name** and **SHA-256 certificate fingerprints**.
 
-| Build | Certificate | Where to find the SHA-256 |
-|---|---|---|
-| From Google Play with Play App Signing | Google's app signing key | Play Console, your app, App integrity, App signing, "App signing key certificate" |
-| Internal builds you sign | your upload key | `keytool -list -v -keystore upload-keystore.jks -alias upload` |
-| Debug builds | `~/.android/debug.keystore` | `./gradlew :app:signingReport` |
+| Field | Where to find your value |
+| --- | --- |
+| Package name | The `applicationId` in your app module's Gradle configuration |
+| Fingerprint for Play Store builds | Play Console → your app → App integrity → App signing → **App signing key certificate** |
+| Fingerprint for a debug build | Run `./gradlew :app:signingReport` in your Android project and copy the debug SHA-256 |
+| Fingerprint for another signed build | Use the certificate that signs the build your users actually install |
 
-With Play App Signing, store builds are signed by Google's key, not your upload key. Registering only the upload key is the most common reason links open the app in local builds but not in the Play build.
+Play App Signing uses Google's app signing certificate. Include that certificate for Play builds, even if your debug build already works.
 
-Register in the Appy dashboard, or with a secret key from your terminal or servers:
+Select **Register app**. On that app's page, open **SDK setup** and copy the **Publishable key** and **Link domain**. If the same product also runs on iOS, add iOS to the same dashboard app.
 
-```bash
-curl https://api.appy.to/v1/apps \
-  -H "Authorization: Bearer $APPY_SECRET_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "name": "Acme Shop",
-        "subdomain": "acme",
-        "android": {
-          "packageName": "com.acme.shop",
-          "sha256CertFingerprints": ["14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5"]
-        }
-      }'
-```
+Replace `YOUR_PUBLISHABLE_KEY` and `your-app.appy.to` in the examples with those two dashboard values. Keep `Appy`, `AppyConfig` and `to.appy.sdk`: these are library names, not your app's name or package ID. [See the value-by-value explanation](SETUP.md).
 
-The `201` response contains `linkDomain` (for example `acme.appy.to`, used in `linkDomains` and in your intent filter) and `publishableKey`. The subdomain cannot be changed later. Add certificates later with `PATCH /v1/apps/{id}` and the complete `android` object; the file changes within about a minute. Check it:
-
-```bash
-curl -si https://acme.appy.to/.well-known/assetlinks.json
-```
-
-It must answer `200` with `application/json`, without redirects, listing your package and fingerprints.
+Appy publishes the domain-verification file for you. The next step lets Android associate that domain with your app. No `curl` command or secret API key is needed for this flow. Server-side registration automation is documented separately in the [developer API reference](https://api.appy.to/docs).
 
 ## Intent filters
 
@@ -123,20 +102,20 @@ It must answer `200` with `application/json`, without redirects, listing your pa
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
         <data android:scheme="https" />
-        <data android:host="acme.appy.to" />
+        <data android:host="your-app.appy.to" />
     </intent-filter>
 
     <intent-filter>
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="acme" />
+        <data android:scheme="yourapp" />
     </intent-filter>
 </activity>
 ```
 
-- The `autoVerify` filter is the App Link: once verified, taps on `https://acme.appy.to/...` open the app instead of the browser. It matches the whole host because Appy links are `https://acme.appy.to/<slug>`.
-- The custom scheme is the fallback for in-app browsers (Instagram, Facebook, some mail apps) that never hand links to Android. Appy's page then opens `acme://...?appy_click_id=...`, which the SDK recognises by `appy_click_id`. Custom-scheme URLs without it are left to your code. The same filter lets the SDK open deferred deep links for you (see [`openDeferredDeepLinks`](#open-deferred-deep-links-automatically)).
+- The `autoVerify` filter is the App Link: once verified, taps on `https://your-app.appy.to/...` open the app instead of the browser. It matches the whole host because Appy links are `https://your-app.appy.to/<slug>`.
+- The custom scheme is the fallback for in-app browsers (Instagram, Facebook, some mail apps) that never hand links to Android. Appy's page then opens `yourapp://...?appy_click_id=...`, which the SDK recognises by `appy_click_id`. Custom-scheme URLs without it are left to your code. The same filter lets the SDK open deferred deep links for you (see [`openDeferredDeepLinks`](#open-deferred-deep-links-automatically)).
 - With `singleTask` or `singleTop`, links that arrive while the app runs go to `onNewIntent`; with `standard`, Android creates a new activity and the SDK picks the intent up automatically.
 
 ## Initialise
@@ -144,10 +123,10 @@ It must answer `200` with `application/json`, without redirects, listing your pa
 Kotlin:
 
 ```kotlin
-class ShopApplication : Application() {
+class YourApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        Appy.init(this, AppyConfig("appy_pk_4NkP0z0cS8y1v7QeXw2mTa9bLr3HdJ6u", listOf("acme.appy.to")).apply {
+        Appy.init(this, AppyConfig("YOUR_PUBLISHABLE_KEY", listOf("your-app.appy.to")).apply {
             logLevel = if (BuildConfig.DEBUG) AppyLogLevel.DEBUG else AppyLogLevel.ERROR
         })
     }
@@ -157,11 +136,11 @@ class ShopApplication : Application() {
 Java:
 
 ```java
-public class ShopApplication extends Application {
+public class YourApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        AppyConfig config = new AppyConfig("appy_pk_4NkP0z0cS8y1v7QeXw2mTa9bLr3HdJ6u", Collections.singletonList("acme.appy.to"));
+        AppyConfig config = new AppyConfig("YOUR_PUBLISHABLE_KEY", Collections.singletonList("your-app.appy.to"));
         config.setLogLevel(BuildConfig.DEBUG ? AppyLogLevel.DEBUG : AppyLogLevel.ERROR);
         Appy.init(this, config);
     }
@@ -224,8 +203,8 @@ An Appy link goes to your deep link listener as `Found` with `isDeferred = false
 Email tools wrap every link in a click-tracking URL on their own domain. When that domain serves an `assetlinks.json` file for your app and your manifest has a verified intent filter for it, a tap opens the app with the tracking URL, not with your link. List the domain in `emailLinkDomains`; launch intents and `handleIntent` pick these links up like any other:
 
 ```kotlin
-val config = AppyConfig("appy_pk_live_...", listOf("acme.appy.to")).apply {
-    emailLinkDomains = listOf("links.acme.com")
+val config = AppyConfig("YOUR_PUBLISHABLE_KEY", listOf("your-app.appy.to")).apply {
+    emailLinkDomains = listOf("links.example.com")
 }
 ```
 
@@ -286,7 +265,7 @@ What the listener can rely on:
 | `AppyDeepLink` | Meaning |
 |---|---|
 | `url: Uri?` | The Appy link that was opened or tapped. |
-| `deeplinkUri: Uri?` | The in-app deep link configured on the link, such as `acme://items?item=42`; with parameter forwarding, the click's query parameters are merged in. |
+| `deeplinkUri: Uri?` | The in-app deep link configured on the link, such as `yourapp://items?item=42`; with parameter forwarding, the click's query parameters are merged in. |
 | `slug: String` | The link's slug in Appy. |
 | `parameters: Map<String, String>` | Query parameters of the tapped link, first value per name, without the reserved `appy_` ones. |
 | `isDeferred: Boolean` | `true` when the link was tapped before the app was installed. |
@@ -296,7 +275,7 @@ If Appy cannot be reached after three attempts, or answers without a link, a lin
 
 ## Deferred deep linking
 
-1. Someone taps `https://acme.appy.to/spring?item=42` without the app installed.
+1. Someone taps `https://your-app.appy.to/spring?item=42` without the app installed.
 2. Appy records the tap and opens your Google Play or AppGallery listing, passing the link along in the store's install referrer.
 3. On the first launch after install the SDK reads the referrer from the store that installed the app (waiting at most 3 s) and sends it with the launch open.
 4. Appy matches the install to the link, and the listener receives `Found` with `isDeferred = true`, the same `slug`, `parameters` and `deeplinkUri` as a direct open.
@@ -324,7 +303,7 @@ The referrer is sent unmodified as `installReferrer`, with the store it came fro
 With `openDeferredDeepLinks = true`, when the first launch receives `Found` with `isDeferred = true` and the link has a `deeplinkUri`, the SDK calls your listener and then starts an `ACTION_VIEW` intent for that URI, restricted to your own package so it never opens another app or the browser. The activity whose intent filter matches (the custom-scheme filter above) receives it, in `onCreate` or, with `singleTask`, in `onNewIntent`. It happens even when no listener is set yet.
 
 ```kotlin
-AppyConfig("appy_pk_...", listOf("acme.appy.to")).apply { openDeferredDeepLinks = true }
+AppyConfig("YOUR_PUBLISHABLE_KEY", listOf("your-app.appy.to")).apply { openDeferredDeepLinks = true }
 ```
 
 ```java
@@ -400,7 +379,7 @@ Installs from ads that never touched an Appy link are attributed from the networ
 - **Meta (Facebook, Instagram):** set your Facebook App ID and paste the Install Referrer Decryption Key (Meta App Dashboard → App settings → Basic → Android) into your app's settings in the Appy dashboard. On the first launch the SDK reads the Meta Install Referrer from the Facebook, Instagram or Facebook Lite app and Appy decrypts the campaign, ad set and ad on the server.
 
 ```kotlin
-Appy.init(this, AppyConfig("appy_pk_...", listOf("acme.appy.to")).apply {
+Appy.init(this, AppyConfig("YOUR_PUBLISHABLE_KEY", listOf("your-app.appy.to")).apply {
     metaAppId = "1234567890"
 })
 ```
@@ -413,12 +392,7 @@ Strict attribution is an app setting on your app's page in the Appy dashboard, n
 
 ### Rewards and anything of value
 
-Route users on any `Found` link, but confirm on your server before granting referral rewards, invites, discounts or account access. Call `Appy.setUserId` after sign-in, then look the install up with your secret key:
-
-```bash
-curl "https://api.appy.to/v1/apps/$APP_ID/installs?userId=u_123" \
-  -H "Authorization: Bearer $APPY_SECRET_KEY"
-```
+Route users on any `Found` link, but confirm on your server before granting referral rewards, invites, discounts or account access. Call `Appy.setUserId` after sign-in. Your backend can then check the install through the [server attribution API](https://api.appy.to/docs). That check runs on your server with a server credential; it is not mobile SDK setup.
 
 Grant the reward only when the install's `attribution.verified` is `true`.
 
@@ -477,7 +451,7 @@ For the Play Data safety form, consider "Device or other IDs" (the install id), 
 If the user has to agree first, set `Appy.isTrackingEnabled = false` before `Appy.init`, because `init` starts the launch open right away, and set it to `true` once the user agrees:
 
 ```kotlin
-class ShopApplication : Application() {
+class YourApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Appy.isTrackingEnabled = consentStore.hasAnalyticsConsent()
@@ -517,18 +491,18 @@ The SDK has no delete call, because your backend owns the relationship with the 
 val url: Uri? = Appy.buildLink("spring", mapOf("item" to "42"))
 ```
 
-The result is `https://acme.appy.to/spring?item=42`: the first link domain, the slug lower-cased and matching `[a-z0-9-]{1,64}`, parameters sorted and percent-encoded. It is `null` before `init`, without a link domain or for an invalid slug. The slug must belong to an existing link; nothing is created on the server.
+The result is `https://your-app.appy.to/spring?item=42`: the first link domain, the slug lower-cased and matching `[a-z0-9-]{1,64}`, parameters sorted and percent-encoded. It is `null` before `init`, without a link domain or for an invalid slug. The slug must belong to an existing link; nothing is created on the server.
 
 ## Debugging
 
 - Set `logLevel = AppyLogLevel.DEBUG` and run `adb logcat -s Appy`. The SDK logs each request, retry, the install referrer, each deep link and attribution it delivers, and why anything was dropped. The key is only logged as its first 12 characters.
-- Verification state (Android 12 and newer): `adb shell pm get-app-links com.acme.shop` should show `acme.appy.to: verified`. After fixing the file or fingerprints: `adb shell pm verify-app-links --re-verify com.acme.shop`.
-- What Google sees: `curl "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://acme.appy.to&relation=delegate_permission/common.handle_all_urls"`.
+- Verification state (Android 12 and newer): `adb shell pm get-app-links com.example.yourapp` should show `your-app.appy.to: verified`. After fixing the file or fingerprints: `adb shell pm verify-app-links --re-verify com.example.yourapp`.
+- What Google sees: `curl "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://your-app.appy.to&relation=delegate_permission/common.handle_all_urls"`.
 - Open a link (quote the command so `&` reaches the device), once with the app stopped and once in the foreground:
 
 ```bash
-adb shell 'am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "https://acme.appy.to/spring?item=42&utm_source=adb"'
-adb shell 'am start -W -a android.intent.action.VIEW -d "acme://items/42?appy_click_id=test123" com.acme.shop'
+adb shell 'am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "https://your-app.appy.to/spring?item=42&utm_source=adb"'
+adb shell 'am start -W -a android.intent.action.VIEW -d "yourapp://items/42?appy_click_id=test123" com.example.yourapp'
 ```
 
 - Deferred deep links: see [Testing deferred deep links](#testing-deferred-deep-links) below.
@@ -555,7 +529,13 @@ Every install gets a new random install id, so there is no test device to regist
 
 An install from the Play listing the link opened also carries the link in the Play install referrer. A build installed with adb or Android Studio does not, so a local test goes through the same matching as installs from other stores and sideloads, and with [strict attribution](#strict-attribution) on it gets `NotFound`. To test the referrer, install from the listing the link opens, on an internal testing track in Play or on AppGallery (AppGallery 10.5.0.300 or newer); both stores keep the referrer for 90 days.
 
-With `logLevel = AppyLogLevel.DEBUG`, `adb logcat -s Appy` shows each step: `Install referrer from` with the referrer or `unavailable`, `Sending open: firstLaunch=true`, then `Deep link: slug=spring, deferred=true` and the install attribution. `adb shell dumpsys package com.acme.shop | grep installerPackageName` shows the store Android recorded as the installer.
+With `logLevel = AppyLogLevel.DEBUG`, `adb logcat -s Appy` shows each step: `Install referrer from` with the referrer or `unavailable`, `Sending open: firstLaunch=true`, then `Deep link: slug=spring, deferred=true` and the install attribution. `adb shell dumpsys package com.example.yourapp | grep installerPackageName` shows the store Android recorded as the installer.
+
+## Lightweight by design
+
+The SDK uses the Kotlin standard library and Google Play Install Referrer. It does not require Play Services, HMS Core or a networking library. Network requests and event delivery run in the background.
+
+The release AAR contains Appy code; a local AAR does not include its external dependencies. Follow the dependency list in [Requirements and installation](#requirements-and-installation). For data collection and consent controls, see [User id, privacy and opt-out](#user-id-privacy-and-opt-out).
 
 ## API reference
 
