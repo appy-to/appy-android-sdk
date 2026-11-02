@@ -18,16 +18,15 @@ Replace `YOUR_PUBLISHABLE_KEY` and `your-app.appy.to` below with those two value
 
 ### 2. Install
 
-Download **appy-sdk-1.0.0.aar** from [GitHub Releases](https://github.com/appy-to/appy-android-sdk/releases/tag/1.0.0), copy it to `app/libs/`, and add to your app module:
+Add the SDK from [Maven Central](https://central.sonatype.com/artifact/to.appy/appy-sdk/1.0.0) to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation(files("libs/appy-sdk-1.0.0.aar"))
-    implementation("com.android.installreferrer:installreferrer:2.2")
+    implementation("to.appy:appy-sdk:1.0.0")
 }
 ```
 
-Ensure `google()` is in your dependency repositories. [Java-only projects also need the Kotlin standard library](#requirements-and-installation). Maven Central publication is pending.
+Ensure both `google()` and `mavenCentral()` are in your dependency repositories. Gradle resolves the SDK's dependencies automatically. [Requirements and manual AAR installation](#requirements-and-installation).
 
 ### 3. Configure and connect links
 
