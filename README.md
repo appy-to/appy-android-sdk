@@ -2,19 +2,58 @@
 
 ![Appy — Deep links, install attribution and revenue analytics](docs/assets/appy-banner.svg)
 
-**[Start here: short installation guide](QUICKSTART.md)** · [Which names and values do I replace?](SETUP.md)
+Deep links, install attribution and in-app events for your Android app.
 
-**This is a library for your own app.** Keep the `Appy` SDK/package names in code; use your own app name, identifiers, publishable key and link domain. [Get those values from the dashboard](SETUP.md).
+**1.0.0** · Android API 21+ · [MIT](LICENSE)
 
-The Appy Android SDK connects your app to [Appy](https://appy.to) smart links. It opens the right screen when someone taps an Appy link, keeps the link through a fresh install from Google Play, Huawei AppGallery or another store (deferred deep linking), tells you which link brought each install, records in-app events, and builds share links on your link domain.
+[Step-by-step setup](QUICKSTART.md) · [Your dashboard values](SETUP.md) · [API reference](#api-reference) · [Support](mailto:support@appy.to)
 
-- Package `to.appy.sdk`, version 1.0.0
-- Android 5.0 (API 21) or newer
-- Part of the Appy Enterprise plan
+## Quick start
 
-Appy links also work without any SDK: they open the store or your website and pass parameters along. If you do not need in-app routing, deferred deep links or events, see [Using Appy without the SDK](https://appy.to/docs/sdk/http).
+### 1. Get your app's key and domain
 
-## Contents
+In the [Appy dashboard](https://appy.to), open **Apps & SDK → New app**. Register your own app, then copy **Publishable key** and **Link domain** from **SDK setup**. The hosted SDK features require an Enterprise plan.
+
+Replace `YOUR_PUBLISHABLE_KEY` and `your-app.appy.to` below with those two values. Keep the SDK/package names as written. [Help finding your values](SETUP.md).
+
+### 2. Install
+
+Download **appy-sdk-1.0.0.aar** from [GitHub Releases](https://github.com/appy-to/appy-android-sdk/releases/tag/1.0.0), copy it to `app/libs/`, and add to your app module:
+
+```kotlin
+dependencies {
+    implementation(files("libs/appy-sdk-1.0.0.aar"))
+    implementation("com.android.installreferrer:installreferrer:2.2")
+}
+```
+
+Ensure `google()` is in your dependency repositories. [Java-only projects also need the Kotlin standard library](#requirements-and-installation). Maven Central publication is pending.
+
+### 3. Configure and connect links
+
+Import `Appy` and `AppyConfig` from `to.appy.sdk`. In your `Application.onCreate()`, after `super.onCreate()`:
+
+```kotlin
+Appy.init(this, AppyConfig(
+    "YOUR_PUBLISHABLE_KEY",
+    listOf("your-app.appy.to")
+))
+```
+
+Finish the required Android setup: [add the App Link intent filter](#intent-filters), then [receive deep links](#receive-deep-links) and [forward links received while the app is open](#handle-incoming-intents).
+
+### 4. Test your first link
+
+Create a link for this dashboard app, install the matching app build and tap the link. Confirm that your deep-link handler receives it before testing fresh installs or adding event tracking. [Follow the complete walkthrough](QUICKSTART.md).
+
+---
+
+## Detailed guide
+
+The sections below cover platform settings, callbacks, events, consent, troubleshooting and the API. Start here when you need a specific integration detail.
+
+<details>
+<summary>Browse the detailed guide</summary>
 
 1. [Requirements and installation](#requirements-and-installation)
 2. [Register your app](#register-your-app)
@@ -32,6 +71,8 @@ Appy links also work without any SDK: they open the store or your website and pa
 14. [API reference](#api-reference)
 15. [For maintainers](#for-maintainers)
 16. [Third-party licensing](#third-party-licensing)
+
+</details>
 
 ## Requirements and installation
 
