@@ -80,22 +80,17 @@ The sections below cover platform settings, callbacks, events, consent, troubles
 - An app registered with Appy on the Enterprise plan. Keys on other plans receive `403 plan_required`.
 - A publishable key (`appy_pk_...`). Never put a secret key (`appy_sk_...`) in an app.
 
-Download [`appy-sdk-1.0.0.aar` from GitHub Releases](https://github.com/appy-to/appy-android-sdk/releases/tag/1.0.0). Copy it to `app/libs/` and add it together with its one dependency, because a local AAR file does not bring its dependencies along:
+Add the SDK from Maven Central in your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation(files("libs/appy-sdk-1.0.0.aar"))
-    implementation("com.android.installreferrer:installreferrer:2.2")
+    implementation("to.appy:appy-sdk:1.0.0")
 }
 ```
 
-Ensure `google()` is present in your project’s dependency repositories. If this is a Java-only project without the Kotlin Gradle plugin, also add the Kotlin standard library:
+Ensure both `google()` and `mavenCentral()` are present in your dependency repositories. Gradle resolves the Google Install Referrer and Kotlin standard library dependencies automatically.
 
-```kotlin
-implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
-```
-
-Maven Central installation is being prepared. Use the GitHub AAR instructions above for now.
+A [manual AAR download](https://github.com/appy-to/appy-android-sdk/releases/tag/1.0.0) is also available. Local AAR integrations must declare `com.android.installreferrer:installreferrer:2.2` and `org.jetbrains.kotlin:kotlin-stdlib:2.0.21` explicitly.
 
 No ProGuard or R8 rules are needed. The manifest merges `android.permission.INTERNET` and two `<queries>` entries, which keep the Play Store's install referrer service and AppGallery's attribution provider visible on Android 11 and newer:
 

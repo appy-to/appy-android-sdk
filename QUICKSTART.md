@@ -16,20 +16,17 @@ In every snippet below:
 
 The hosted SDK features require an Enterprise plan. You do not need a secret API key or a `curl` registration request for these steps.
 
-## 2. Add the SDK file to your project
+## 2. Add the SDK from Maven Central
 
-1. Download **appy-sdk-1.0.0.aar** from [GitHub Releases](https://github.com/appy-to/appy-android-sdk/releases/tag/1.0.0).
-2. Copy the file into your app module's `libs/` folder, usually `app/libs/`.
-3. Add these dependencies to that app module's `build.gradle.kts`:
+Ensure your project's dependency repositories include `google()` and `mavenCentral()`, then add this to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation(files("libs/appy-sdk-1.0.0.aar"))
-    implementation("com.android.installreferrer:installreferrer:2.2")
+    implementation("to.appy:appy-sdk:1.0.0")
 }
 ```
 
-Keep the `appy-sdk` filename and Google dependency name. Ensure `google()` is present in your project's dependency repositories. Java-only projects without the Kotlin plugin also need [the Kotlin standard library dependency](README.md#requirements-and-installation). Maven Central installation is not available yet.
+Keep the `to.appy:appy-sdk` library coordinates. Gradle brings in its native dependencies automatically.
 
 ## 3. Connect your link domain to your app
 
